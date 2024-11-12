@@ -1,0 +1,105 @@
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.mixture import GaussianMixture
+from sklearn.metrics import silhouette_score, davies_bouldin_score
+
+# Load and preview dataset
+df = pd.read_csv('Mall_Customers.csv')
+df.head()
+
+# Check for missing values
+print("Missing values in each column:\n", df.isnull().sum())
+
+# Basic stats and info
+df.describe()
+df.info()
+
+# Encode 'Genre' to numeric
+label_encoder = LabelEncoder()
+df['Genre'] = label_encoder.fit_transform(df['Genre'])
+
+# Scale selected features
+scaler = StandardScaler()
+df[['Annual Income (k$)', 'Spending Score (1-100)']] = scaler.fit_transform(df[['Annual Income (k$)', 'Spending Score (1-100)']])
+
+# Select features for clustering
+X = df[['Annual Income (k$)', 'Spending Score (1-100)']]
+
+# 1. K-Means Clustering: Find optimal k using Elbow Method
+inertia = []
+for k in range(1, 11):
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X)
+    inertia.append(kmeans.inertia_)
+
+# Plot Elbow graph
+plt.figure(figsize=(8, 5))
+plt.plot(range(1, 11), inertia, 'bo-')
+plt.xlabel('Number of Clusters')
+plt.ylabel('Inertia')
+plt.title('Elbow Method to Determine Optimal K')
+plt.show()
+
+# Fit K-Means with optimal clusters (e.g., 5 based on elbow plot)
+optimal_clusters = 5
+kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
+df['Cluster_KMeans'] = kmeans.fit_predict(X)
+
+# 2. DBSCAN Clustering: Fit with chosen eps and min_samples
+dbscan = DBSCAN(eps=0.5, min_samples=5)
+df['Cluster_DBSCAN'] = dbscan.fit_predict(X)
+
+# 3. GMM Clustering: Fit with optimal clusters
+gmm = GaussianMixture(n_components=optimal_clusters, random_state=42)
+df['Cluster_GMM'] = gmm.fit_predict(X)
+
+# Visualize clusters for each method
+plt.figure(figsize=(18, 5))
+
+# K-Means Visualization
+plt.subplot(1, 3, 1)
+sns.scatterplot(data=df, x='Annual Income (k$)', y='Spending Score (1-100)', hue='Cluster_KMeans', palette='viridis')
+plt.title('K-Means Clustering')
+
+# DBSCAN Visualization
+plt.subplot(1, 3, 2)
+sns.scatterplot(data=df, x='Annual Income (k$)', y='Spending Score (1-100)', hue='Cluster_DBSCAN', palette='viridis')
+plt.title('DBSCAN Clustering')
+
+# GMM Visualization
+plt.subplot(1, 3, 3)
+sns.scatterplot(data=df, x='Annual Income (k$)', y='Spending Score (1-100)', hue='Cluster_GMM', palette='viridis')
+plt.title('Gaussian Mixture Model Clustering')
+
+plt.show()
+
+# Evaluation Metrics for each model
+# K-Means Evaluation
+kmeans_silhouette = silhouette_score(X, df['Cluster_KMeans'])
+kmeans_davies_bouldin = davies_bouldin_score(X, df['Cluster_KMeans'])
+print("K-Means Silhouette Score:", kmeans_silhouette)
+print("K-Means Davies-Bouldin Index:", kmeans_davies_bouldin)
+
+# DBSCAN Evaluation (exclude noise points for silhouette score)
+dbscan_labels = df['Cluster_DBSCAN']
+dbscan_labels_filtered = dbscan_labels[dbscan_labels != -1]
+X_dbscan_filtered = X[dbscan_labels != -1]
+
+if len(set(dbscan_labels_filtered)) > 1:  # Only if >1 cluster
+    dbscan_silhouette = silhouette_score(X_dbscan_filtered, dbscan_labels_filtered)
+    dbscan_davies_bouldin = davies_bouldin_score(X_dbscan_filtered, dbscan_labels_filtered)
+    print("DBSCAN Silhouette Score (excl. noise):", dbscan_silhouette)
+    print("DBSCAN Davies-Bouldin Index (excl. noise):", dbscan_davies_bouldin)
+else:
+    print("DBSCAN clustering did not find enough clusters.")
+
+# GMM Evaluation
+gmm_silhouette = silhouette_score(X, df['Cluster_GMM'])
+gmm_davies_bouldin = davies_bouldin_score(X, df['Cluster_GMM'])
+print("GMM Silhouette Score:", gmm_silhouette)
+print("GMM Davies-Bouldin Index:", gmm_davies_bouldin)
