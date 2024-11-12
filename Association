@@ -1,0 +1,44 @@
+!pip install pandas mlxtend
+
+import pandas as pd
+df = pd.read_csv('/content/Market_Basket_Optimisation.csv', header=None)
+df.head()
+
+transactions = []
+for i in range(len(df)):
+    transaction = [str(value) for value in df.iloc[i] if pd.notna(value)]
+    transactions.append(transaction)
+
+from mlxtend.preprocessing import TransactionEncoder
+
+te = TransactionEncoder()
+te_ary = te.fit(transactions).transform(transactions)
+df_trans = pd.DataFrame(te_ary, columns=te.columns_)
+df_trans.head()
+
+from mlxtend.frequent_patterns import apriori
+
+frequent_itemsets = apriori(df_trans, min_support=0.003, use_colnames=True)
+frequent_itemsets.head()
+
+from mlxtend.frequent_patterns import association_rules
+
+rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.2)
+rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].head()
+
+import matplotlib.pyplot as plt
+
+plt.scatter(rules['support'], rules['confidence'], alpha=0.5, marker="o")
+plt.xlabel('Support')
+plt.ylabel('Confidence')
+plt.title('Support vs Confidence')
+plt.show()
+
+rules_high_conf = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.5)
+rules_high_conf[['antecedents', 'consequents', 'support', 'confidence', 'lift']].head()
+
+plt.scatter(rules_high_conf['support'], rules_high_conf['confidence'], alpha=0.5, marker="o")
+plt.xlabel('Support')
+plt.ylabel('Confidence')
+plt.title('Support vs Confidence')
+plt.show()
